@@ -1,49 +1,38 @@
-##############################################################################
-#                                                                            #                       
-#   argparse — Parser for command-line options, arguments and sub-commands   #     
-#                                                                            #
-#   Ironhack Data Part Time --> Feb-2023                                    #
-#                                                                            #
-##############################################################################
-
-
 # import library
 
+from modules import modules as m
 import argparse
 
-
-# Script functions 
-
-def sum_function(x1, x2):
-    return x1 + x2
-    
-def multiply_function(x1, x2):
-    return x1 * x2
-    
-
-# Argument parser function
+#argparse
 
 def argument_parser():
-    parser = argparse.ArgumentParser(description= 'Application for arithmetic calculations' )
-    help_message ='You have two options. Option 1: "mult" performs multiplication of two given numbers. Option 2: "sum" performs the sum of two given numbers' 
-    parser.add_argument('-f', '--function', help=help_message, type=str)
+    parser = argparse.ArgumentParser(description= 'Find the closest BiciMAD station')
+    help_message_l ='Use -l to specify the point of interest of your choice' 
+    help_message_f = 'Do not filter BiciMAD stations by bikes avaibility'
+    parser.add_argument('-l', '--location', help=help_message_l, type=str, default='')
+    parser.add_argument('-f', '--filter', help=help_message_f, action='store_true')
     args = parser.parse_args()
     return args
 
 
-# Input data
+# Variables
 
-n1 = float(input('Enter a number: '))
-n2 = float(input('Enter another number: '))
+base_url = 'https://datos.madrid.es/egob/'
+resource = 'catalogo/300356-0-monumentos-ciudad-madrid.json'
+endpoint = base_url + resource
 
+bici_db_loc = './data/bicimad.db'
+save_in = './data/'
+save_name = 'mon_bici.csv'
+place = argument_parser().location
+unfilter = argument_parser().filter
 
 # Pipeline execution
 
 if __name__ == '__main__':
-    if argument_parser().function == 'mult':
-        result = multiply_function(n1, n2)
-    elif argument_parser().function == 'sum':
-        result = sum_function(n1, n2)
-    else:
-        result = 'FATAL ERROR...you need to select the correct method'
-    print(f'The result is => {result}')
+    DF_MON = m.request_api_cmadrid(endpoint, place)
+    DF_BICI = m.request_api_bicimad(bici_db_loc, unfilter)
+    DF_FINAL = m.full_df_calc (DF_MON, DF_BICI)
+    m.save_results(DF_FINAL, save_in, save_name)
+        
+    print(f'Success: {save_name} file was saved in the {save_in} directory!')
