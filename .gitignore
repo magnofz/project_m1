@@ -122,6 +122,7 @@ venv.bak/
 
 # trash files
 __trash__/
+__dotenv__/
 
 # mypy
 .mypy_cache/
