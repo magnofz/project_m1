@@ -1,8 +1,6 @@
 import pandas as pd
 import requests
 import json
-import duckdb
-import re
 from shapely.geometry import Point
 import geopandas as gpd
 from fuzzywuzzy import process
@@ -59,22 +57,23 @@ def request_api_cmadrid(ep, place):
 ## API BICIMAD - REQUEST/DATAFRAME
 #########################################################################################################################################
 
-def request_api_bicimad(epb, flag):
+def request_api_bicimad(ep_1, ep_2, mail, pw, flag):
     #request info from bicimad api and turn it into a dataframe
-    con = duckdb.connect(database=epb, read_only=False)
-    df_bicimad = con.execute("""SELECT id AS bic_id, name AS "BiciMAD station", address AS "Station location",
-                            dock_bikes AS "Bikes Available", "geometry.coordinates" AS bic_coord FROM bicimad_stations""").fetch_df()
+    headers_login = {'email': mail, 'password' : pw}
+    token = requests.get(ep_1, headers=headers_login).json()['data'][0]['accessToken']
+    bici_json = requests.get(ep_2, headers={'accessToken' : token}).json()
 
-    if flag:
+    dict_bici = {'BiciMAD Station' : [bici_json['data'][b]['name'] for b in range(len(bici_json['data']))],
+             'Station Location' : [bici_json['data'][l]['address'] for l in range(len(bici_json['data']))],
+             'Bikes Available' : [bici_json['data'][d]['dock_bikes'] for d in range(len(bici_json['data']))],
+             'bic_lat' : [bici_json['data'][y]['geometry']['coordinates'][1] for y in range(len(bici_json['data']))],
+             'bic_lon' : [bici_json['data'][x]['geometry']['coordinates'][0] for x in range(len(bici_json['data']))]}
+    
+    df_bicimad = pd.DataFrame(dict_bici)
+    
+    if not flag:
         df_bicimad = df_bicimad[df_bicimad['Bikes Available'] > 0].reset_index()
         df_bicimad.drop(columns='index', inplace=True)
-    
-    regex_loc = '[^, \[\]]+'
-    
-    bici_loc = [(float(re.findall(regex_loc, df_bicimad['bic_coord'][i])[1]),
-                float(re.findall(regex_loc, df_bicimad['bic_coord'][i])[0])) for i in range(len(df_bicimad))]
-
-    df_bicimad = df_bicimad.join(pd.DataFrame(bici_loc, columns=['bic_lat', 'bic_lon']))
 
     return df_bicimad
 
@@ -86,13 +85,13 @@ def full_df_calc (df1, df2):
     #calculate the distances between monuments df and bicimad df and return a dataframe with the closest station per each monument
     full_df = df1.merge(df2, how='cross')
     full_df['pit'] = full_df.apply(lambda x : (x['mon_lat'] - x['bic_lat'])**2 + (x['mon_lon'] - x['bic_lon'])**2 , axis=1)
-    bici_min = pd.DataFrame(full_df.groupby(['Place of interest', 'Place address','mon_lat','mon_lon'])['pit'].min())
+    bici_min = pd.DataFrame(full_df.groupby(['Place of interest', 'Place address', 'mon_lat', 'mon_lon'])['pit'].min())
     bici_min = bici_min.reset_index()
     mon_bici = bici_min.merge(full_df, how='left').sort_values(by=['Place of interest'])
     mon_bici['Distance (m)'] = mon_bici.apply(lambda x : distance_meters(x['mon_lat'], x['mon_lon'], x['bic_lat'], x['bic_lon']), axis=1)
     mon_bici['Walking time (min)'] = mon_bici.apply(lambda x : x['Distance (m)'] / 1000 * 12.5, axis=1)
     mon_bici['Distance (m)'], mon_bici['Walking time (min)'] = mon_bici['Distance (m)'].astype(int), mon_bici['Walking time (min)'].astype(int)
-    final_df = mon_bici[['Place of interest', 'Type of place', 'Place address', 'BiciMAD station', 'Station location',
+    final_df = mon_bici[['Place of interest', 'Type of place', 'Place address', 'BiciMAD Station', 'Station Location',
                          'Bikes Available', 'Distance (m)', 'Walking time (min)']]
 
     return final_df

@@ -2,6 +2,8 @@
 
 from modules import modules as m
 import argparse
+import os
+from dotenv import load_dotenv
 
 #argparse
 
@@ -14,16 +16,30 @@ def argument_parser():
     args = parser.parse_args()
     return args
 
-
-# Variables
+# API Comunidad de Madrid Variables
 
 base_url = 'https://datos.madrid.es/egob/'
 resource = 'catalogo/300356-0-monumentos-ciudad-madrid.json'
 endpoint = base_url + resource
 
-bici_db_loc = './data/bicimad.db'
+# API BiciMad variables
+
+url_login = 'https://openapi.emtmadrid.es/v2/mobilitylabs/user/login/'
+url_stations = 'https://openapi.emtmadrid.es/v1/transport/bicimad/stations/'
+
+env_path = './__dotenv__/.env'
+load_dotenv(env_path)
+
+email = os.getenv('MAIL')
+pw = os.getenv('PASSWORD')
+
+# save files variables
+
 save_in = './data/'
 save_name = 'mon_bici.csv'
+
+# argparse variables
+
 place = argument_parser().location
 unfilter = argument_parser().filter
 
@@ -31,7 +47,7 @@ unfilter = argument_parser().filter
 
 if __name__ == '__main__':
     DF_MON = m.request_api_cmadrid(endpoint, place)
-    DF_BICI = m.request_api_bicimad(bici_db_loc, unfilter)
+    DF_BICI = m.request_api_bicimad(url_login, url_stations, email, pw, unfilter)
     DF_FINAL = m.full_df_calc (DF_MON, DF_BICI)
     m.save_results(DF_FINAL, save_in, save_name)
         
