@@ -36,7 +36,7 @@ pw = os.getenv('PASSWORD')
 # save files variables
 
 save_in = './data/'
-save_name = 'mon_bici.csv'
+save_name = 'mon_bic.csv'
 
 # argparse variables
 
